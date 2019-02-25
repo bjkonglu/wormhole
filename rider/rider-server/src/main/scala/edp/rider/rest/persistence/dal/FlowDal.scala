@@ -48,6 +48,7 @@ class FlowDal(flowTable: TableQuery[FlowTable], streamTable: TableQuery[StreamTa
 
     val streamIds = flows.map(_.streamId).distinct
 
+    // streamId -> StreamInfo
     val streamMap = streamDal.refreshStreamStatus(None, Some(streamIds))
       .map(stream => (stream.id, StreamInfo(stream.name, stream.sparkAppid, stream.streamType, stream.functionType, stream.status)))
       .toMap[Long, StreamInfo]
@@ -59,6 +60,7 @@ class FlowDal(flowTable: TableQuery[FlowTable], streamTable: TableQuery[StreamTa
     val flowDisableActions = getDisableActions(flows)
 
     Future(flowStreams.map(flowStream => {
+      // 启动任务
       genFlowStreamByAction(FlowStream(flowStream.id, flowStream.flowName, flowStream.projectId, flowStream.streamId, flowStream.sourceNs, flowStream.sinkNs, flowStream.parallelism, flowStream.consumedProtocol,
         flowStream.sinkConfig, flowStream.tranConfig, flowStream.tableKeys, flowStream.desc, flowStream.status, flowStream.startedTime, flowStream.stoppedTime, flowStream.logPath, flowStream.active, flowStream.createTime,
         flowStream.createBy, flowStream.updateTime, flowStream.updateBy, flowStream.streamName, flowStream.streamAppId, flowStream.streamStatus, flowStream.streamType, flowStream.functionType, flowDisableActions(flowStream.id), getHideActions(flowStream.streamType, flowStream.functionType), flowStream.topicInfo, flowStream.currentUdf, flowStream.msg), action)
@@ -183,6 +185,7 @@ class FlowDal(flowTable: TableQuery[FlowTable], streamTable: TableQuery[StreamTa
 
   def genFlowStreamByAction(flowStream: FlowStream, action: String): FlowStream = {
     try {
+      // 启动任务
       val flowStatus = actionRule(flowStream, action)
 
       updateStatusByAction(flowStream.id, flowStatus.flowStatus, flowStatus.startTime, flowStatus.stopTime)

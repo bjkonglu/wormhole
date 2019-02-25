@@ -288,6 +288,7 @@ object FlowUtils extends RiderLogger {
           FlowInfo(flowStream.id, flowStream.status, "renew", flowStream.startedTime, flowStream.stoppedTime, s"$action success.")
 
         case ("running", "new" | "stopped" | "failed", "start") =>
+          // 启动Flink任务
           if (startFlinkFlow(flowStream.streamAppId.get, getFlowByFlowStream(flowStream)))
             FlowInfo(flowStream.id, "starting", "start,renew,stop,delete", Option(currentSec), None, s"$action success.")
           else
@@ -953,7 +954,7 @@ object FlowUtils extends RiderLogger {
     }
   }
 
-  def generateFlinkFlowStartSh(appId: String, flow: Flow): String = {
+  def generateFlinkFlowStartShOrigin(appId: String, flow: Flow): String = {
     val address = getJobManagerAddressOnYarn(appId)
     riderLogger.info(s"Flow ${flow.id} JobManager address: $address")
     val config1 = getWhFlinkConfig(flow)
@@ -963,7 +964,24 @@ object FlowUtils extends RiderLogger {
     s"""
        |ssh -p${RiderConfig.spark.sshPort} ${RiderConfig.spark.user}@${RiderConfig.riderServer.host}
        |${RiderConfig.flink.homePath}/bin/flink run
-       |-m $address ${RiderConfig.flink.jarPath} '${config1}' '${config2}'
+       |-m $address ${RiderConfig.flink.jarPath} '''${config1}''' '''${config2}'''
+       |> $logPath 2>&1
+     """.stripMargin.replaceAll("\n", " ").trim
+  }
+
+
+  def generateFlinkFlowStartSh(appId: String, flow: Flow): String = {
+
+    val config1 = getWhFlinkConfig(flow)
+    val config2 = getFlinkFlowConfig(flow)
+    val logPath = getLogPath(getFlowName(flow.id, flow.sourceNs, flow.sinkNs))
+
+    flowDal.updateLogPath(flow.id, logPath)
+
+    s"""
+       |ssh -p${RiderConfig.spark.sshPort} ${RiderConfig.spark.user}@${RiderConfig.riderServer.host}
+       |${RiderConfig.flink.homePath}/bin/flink run
+       |-yid $appId ${RiderConfig.flink.jarPath} '''${config1}''' '''${config2}'''
        |> $logPath 2>&1
      """.stripMargin.replaceAll("\n", " ").trim
   }

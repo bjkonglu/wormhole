@@ -166,6 +166,7 @@ class WormholeFlinkMainProcess(config: WormholeFlinkxConfig, umsFlowStart: Ums) 
       })
     val jsonSourceParseMap: Map[(UmsProtocolType, String), (Seq[UmsField], Seq[FieldInfo], ArrayBuffer[(String, String)])] = ConfMemoryStorage.getAllSourceParseMap
 
+    // 处理原始数据
     val inputStream = processStream.process(new UmsProcessElement(sourceSchemaMap.toMap, config,exceptionConfig, jsonSourceParseMap, kafkaDataTag, assignMetricConfig))(Types.ROW(sourceFieldNameArray, sourceFlinkTypeArray))
 
     val exceptionStream = inputStream.getSideOutput(kafkaDataTag)

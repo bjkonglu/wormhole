@@ -22,7 +22,12 @@ import org.joda.time.DateTime
 
 import scala.collection.mutable.ArrayBuffer
 
-class UmsProcessElement(sourceSchemaMap: Map[String, (TypeInformation[_], Int)], config:WormholeFlinkxConfig, exceptionConfig: ExceptionConfig, jsonSourceParseMap: Map[(UmsProtocolType, String), (Seq[UmsField], Seq[FieldInfo], ArrayBuffer[(String, String)])], kafkaDataTag: OutputTag[String], mConfig:Configuration) extends ProcessFunction[(String, String, String, Int, Long), Row] {
+class UmsProcessElement(sourceSchemaMap: Map[String, (TypeInformation[_], Int)],
+                        config:WormholeFlinkxConfig,
+                        exceptionConfig: ExceptionConfig,
+                        jsonSourceParseMap: Map[(UmsProtocolType, String), (Seq[UmsField], Seq[FieldInfo], ArrayBuffer[(String, String)])],
+                        kafkaDataTag: OutputTag[String],
+                        mConfig:Configuration) extends ProcessFunction[(String, String, String, Int, Long), Row] {
   //private val outputTag = OutputTag[String]("kafkaDataException")
   private lazy val logger = Logger.getLogger(this.getClass)
 
@@ -37,13 +42,20 @@ class UmsProcessElement(sourceSchemaMap: Map[String, (TypeInformation[_], Int)],
   @transient private var firstUmsTs:Long=0L
   @transient private var lastUmsTs:Long=0L
 
-  override def processElement(value: (String, String, String, Int, Long), ctx: ProcessFunction[(String, String, String, Int, Long), Row]#Context, out: Collector[Row]): Unit = {
+  override def processElement(value: (String, String, String, Int, Long),
+                              ctx: ProcessFunction[(String, String, String, Int, Long), Row]#Context,
+                              out: Collector[Row]): Unit = {
     logger.info("in UmsProcessElement source data from kafka " + value._2)
     try {
       val (protocolType, namespace) = UmsCommonUtils.getTypeNamespaceFromKafkaKey(value._1)
-      if(config.feedback_enabled)startMetricsMoinitoring(protocolType.toString)
+
+      if(config.feedback_enabled)
+        // 启动metrics监控
+        startMetricsMoinitoring(protocolType.toString)
+
       if (jsonSourceParseMap.contains((protocolType, namespace))) {
         val mapValue: (Seq[UmsField], Seq[FieldInfo], ArrayBuffer[(String, String)]) = jsonSourceParseMap((protocolType, namespace))
+        // 根据schema解析数据
         val umsTuple = JsonParseUtils.dataParse(value._2, mapValue._2, mapValue._3)
         umsTuple.foreach(tuple => {
           createRow(tuple.tuple, protocolType.toString, out,mapValue._1)
@@ -69,8 +81,9 @@ class UmsProcessElement(sourceSchemaMap: Map[String, (TypeInformation[_], Int)],
     val row = new Row(tuple.size)
     for (i <- tuple.indices)
       row.setField(i, FlinkSchemaUtils.getRelValue(i, tuple(i), sourceSchemaMap))
+    // 输出row
     out.collect(row)
-    if(config.feedback_enabled)moinitorRow(tuple,protocolType,schema)
+    if(config.feedback_enabled) moinitorRow(tuple,protocolType,schema)
   }
 
   def moinitorRow(tuple: Seq[String], protocolType:String, schema:Seq[UmsField]):Unit={
